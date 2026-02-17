@@ -1,146 +1,20 @@
 'use client';
 
-import React, { useEffect, useState, FormEvent } from 'react';
-
-// Interface para o item da watchlist
-interface WatchlistItem {
-  id: string;
-  user_id: string;
-  symbol: string;
-  kind: string; // "crypto", "stock_br", "fii_br"
-  created_at: string;
-}
-
-// Interface para os preços (retorno da /api/prices/get)
-interface PriceData {
-  price: number;
-  last_updated: string;
-}
-
-// Mapeamento de símbolos de cripto para IDs da CoinMarketCap (exemplo)
-// Em um projeto real, isso viria de um banco de dados ou de uma API de mapeamento
-const COINMARKETCAP_ID_MAP: { [symbol: string]: string } = {
-  'BTC': 'bitcoin',
-  'ETH': 'ethereum',
-  // Adicione outros mapeamentos conforme necessário
-};
+import React from 'react';
+import { useWatchlist } from '../../hooks/useWatchlist'; // Importa o hook
+import { WatchlistForm } from '../../components/WatchlistForm'; // Importa o formulário
+import { WatchlistTable } from '../../components/WatchlistTable'; // Importa a tabela
 
 export default function Preview() {
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
-  const [prices, setPrices] = useState<{[symbol: string]: PriceData}>({}); // Novo estado para os preços
-  const [loadingWatchlist, setLoadingWatchlist] = useState(true); // Renomeado para clareza
-  const [loadingPrices, setLoadingPrices] = useState(false); // Novo estado para carregamento de preços
-  const [error, setError] = useState<string | null>(null);
-  const [newSymbol, setNewSymbol] = useState('');
-  const [newKind, setNewKind] = useState('stock_br');
-
-  // Função para buscar a watchlist e os preços (reutilizável para polling)
-  async function fetchWatchlistAndPrices() {
-    setLoadingWatchlist(true);
-    setError(null);
-    try {
-      // 1. Buscar a watchlist do Supabase
-      const watchlistResponse = await fetch('/api/watchlist/get');
-      if (!watchlistResponse.ok) {
-        throw new Error(`HTTP error! status: ${watchlistResponse.status} ao buscar watchlist`);
-      }
-      const watchlistData: WatchlistItem[] = await watchlistResponse.json();
-      setWatchlist(watchlistData);
-
-      // 2. Filtrar apenas as criptomoedas para enviar à API de preços
-      const cryptoItemsToFetch = watchlistData
-        .filter(item => item.kind === 'crypto')
-        .map(item => ({ symbol: item.symbol, kind: item.kind }));
-
-      if (cryptoItemsToFetch.length > 0) {
-        setLoadingPrices(true);
-        const pricesResponse = await fetch('/api/prices/get', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: cryptoItemsToFetch }),
-        });
-
-        if (!pricesResponse.ok) {
-          const errorData = await pricesResponse.json();
-          throw new Error(errorData.error || `HTTP error! status: ${pricesResponse.status} ao buscar preços`);
-        }
-        const pricesData: {[symbol: string]: PriceData} = await pricesResponse.json();
-        setPrices(pricesData);
-      } else {
-        setPrices({}); // Limpa os preços se não houver criptos na watchlist
-      }
-
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoadingWatchlist(false);
-      setLoadingPrices(false);
-    }
-  }
-
-  // useEffect para carregar a watchlist e preços iniciais, e configurar o polling
-  useEffect(() => {
-    fetchWatchlistAndPrices(); // Primeira carga
-
-    const intervalId = setInterval(() => {
-      fetchWatchlistAndPrices(); // Atualiza a cada 10 segundos
-    }, 60000); // 1 minuto
-
-    // Limpa o intervalo quando o componente é desmontado
-    return () => clearInterval(intervalId);
-  }, []);
-
-  // Handler para adicionar um novo item
-  const handleAddItem = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!newSymbol || !newKind) {
-      setError('Símbolo e Tipo são obrigatórios.');
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/watchlist/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: newSymbol, kind: newKind }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      setNewSymbol('');
-      // setWatchlist([...watchlist, newItemData]); // Se a API retornar o item adicionado
-      await fetchWatchlistAndPrices(); // Recarrega tudo para ter os preços atualizados
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
-
-  // Handler para remover um item
-  const handleRemoveItem = async (id: string) => {
-    setError(null);
-    try {
-      const response = await fetch('/api/watchlist/remove', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      // setWatchlist(watchlist.filter(item => item.id !== id)); // Otimização: remover localmente
-      await fetchWatchlistAndPrices(); // Recarrega tudo para ter a lista atualizada
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
+  const {
+    watchlist,
+    prices,
+    loadingWatchlist,
+    loadingPrices,
+    error,
+    handleAddItem,
+    handleRemoveItem,
+  } = useWatchlist();
 
   const currentLoading = loadingWatchlist || loadingPrices;
 
@@ -208,85 +82,21 @@ export default function Preview() {
                 </p>
               </div>
 
-              {/* ----- INÍCIO DA WATCHLIST DINÂMICA COM FORMULÁRIO E PREÇOS ----- */}
+              {/* ----- WATCHLIST REFACTORADA ----- */}
               <div style={itemStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                   <h3 style={{ margin: 0, fontSize: 14 }}>Minha Watchlist</h3>
                 </div>
 
-                {/* Formulário para adicionar item */}
-                <form onSubmit={handleAddItem} style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                  <input
-                    type="text"
-                    placeholder="Símbolo (Ex: BTC, VALE3)"
-                    value={newSymbol}
-                    onChange={(e) => setNewSymbol(e.target.value.toUpperCase())}
-                    style={inputStyle}
-                    required
-                  />
-                  <select
-                    value={newKind}
-                    onChange={(e) => setNewKind(e.target.value)}
-                    style={selectStyle}
-                    required
-                  >
-                    <option value="stock_br">Ação BR</option>
-                    <option value="fii_br">FII BR</option>
-                    <option value="crypto">Cripto</option>
-                  </select>
-                  <button type="submit" style={addButtonStyle}>Adicionar</button>
-                </form>
-
-                {currentLoading && <p style={pStyle}>Carregando dados da watchlist e preços...</p>}
-                {error && <p style={{ ...pStyle, color: '#ff6b6b' }}>Erro: {error}</p>}
-                {!currentLoading && !error && (
-                  watchlist.length === 0 ? (
-                    <p style={pStyle}>Nenhum ativo na watchlist. Adicione alguns acima!</p>
-                  ) : (
-                    <table style={tableStyle}>
-                      <thead>
-                        <tr>
-                          <th style={tableHeaderStyle}>Símbolo</th>
-                          <th style={tableHeaderStyle}>Tipo</th>
-                          <th style={tableHeaderStyle}>Preço Atual (USD)</th>
-                          <th style={tableHeaderStyle}>Última Atualização</th>
-                          <th style={tableHeaderStyle}>Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {watchlist.map((item: WatchlistItem) => {
-                          const itemPriceData = prices[item.symbol];
-                          return (
-                            <tr key={item.id}>
-                              <td style={tableCellStyle}>{item.symbol}</td>
-                              <td style={tableCellStyle}>{item.kind}</td>
-                              <td style={tableCellStyle}>
-                                {item.kind === 'crypto' && itemPriceData?.price
-                                  ? `$${itemPriceData.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                  : (item.kind !== 'crypto' ? 'Aguardando API' : '-')}
-                              </td>
-                              <td style={tableCellStyle}>
-                                {item.kind === 'crypto' && itemPriceData?.last_updated
-                                  ? new Date(itemPriceData.last_updated).toLocaleTimeString()
-                                  : '-'}
-                              </td>
-                              <td style={tableCellStyle}>
-                                <button
-                                  onClick={() => handleRemoveItem(item.id)}
-                                  style={removeButtonStyle}
-                                >
-                                  Remover
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )
-                )}
+                <WatchlistForm onAddItem={handleAddItem} error={error} loading={currentLoading} />
+                <WatchlistTable
+                  watchlist={watchlist}
+                  prices={prices}
+                  onRemoveItem={handleRemoveItem}
+                  loading={currentLoading}
+                />
               </div>
-              {/* ----- FIM DA WATCHLIST DINÂMICA COM FORMULÁRIO E PREÇOS ----- */}
+              {/* ----- FIM WATCHLIST REFACTORADA ----- */}
 
             </div>
           </section>
@@ -297,7 +107,7 @@ export default function Preview() {
               O app web é só um painel. O “Mentor” vive no Telegram:
               <br /><br />
               <code style={{ color: '#b7d5ff' }}>/start</code> cria teu perfil e watchlist.<br />
-              <code style={{ color: '#b7d5ff' }}>/plano</code> mostra o plano 30 dias.<br />
+              <code style={{ color: '#b7d5ff' }}> /plano</code> mostra o plano 30 dias.<br />
               <code style={{ color: '#b7d5ff' }}>/ok</code> e <code style={{ color: '#b7d5ff' }}>/nao</code> registram se você fez a tarefa.<br />
             </p>
 
@@ -389,70 +199,3 @@ const tagStyle: React.CSSProperties = {
 };
 
 const pStyle: React.CSSProperties = { margin: '8px 0 0', color: '#9db0d0', fontSize: 13, lineHeight: 1.5 };
-
-// Novos estilos para a tabela da watchlist
-const tableStyle: React.CSSProperties = {
-  width: '100%',
-  marginTop: 10,
-  borderCollapse: 'collapse',
-};
-
-const tableHeaderStyle: React.CSSProperties = {
-  textAlign: 'left',
-  padding: '8px 0',
-  borderBottom: '1px solid rgba(255,255,255,.10)',
-  color: '#9db0d0',
-  fontSize: 12,
-};
-
-const tableCellStyle: React.CSSProperties = {
-  padding: '8px 0',
-  borderBottom: '1px solid rgba(255,255,255,.05)',
-  color: '#e8f0ff',
-  fontSize: 13,
-  display: 'table-cell',
-  verticalAlign: 'middle',
-};
-
-// Novos estilos para inputs e botões
-const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,.05)',
-  border: '1px solid rgba(255,255,255,.10)',
-  borderRadius: 8,
-  padding: '8px 12px',
-  color: '#e8f0ff',
-  fontSize: 13,
-  flexGrow: 1,
-};
-
-const selectStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,.05)',
-  border: '1px solid rgba(255,255,255,.10)',
-  borderRadius: 8,
-  padding: '8px 12px',
-  color: '#e8f0ff',
-  fontSize: 13,
-};
-
-const addButtonStyle: React.CSSProperties = {
-  background: '#32d583',
-  color: '#0b1220',
-  border: 'none',
-  borderRadius: 8,
-  padding: '8px 12px',
-  cursor: 'pointer',
-  fontSize: 13,
-  fontWeight: 'bold',
-  flexShrink: 0,
-};
-
-const removeButtonStyle: React.CSSProperties = {
-  background: '#ff6b6b',
-  color: '#ffffff',
-  border: 'none',
-  borderRadius: 6,
-  padding: '6px 10px',
-  cursor: 'pointer',
-  fontSize: 12,
-  fontWeight: 'bold',
-};
