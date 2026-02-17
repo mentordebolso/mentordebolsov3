@@ -1,30 +1,97 @@
-'use client'; // <-- Adicionar esta diretiva no topo
+'use client';
 
-import React, { useEffect, useState } from 'react'; // Importar useState e useEffect
+import React, { useEffect, useState, FormEvent } from 'react'; // Adicionar FormEvent
+
+// Interface para o item da watchlist (para tipagem)
+interface WatchlistItem {
+  id: string;
+  user_id: string;
+  symbol: string;
+  kind: string;
+  created_at: string;
+}
 
 export default function Preview() {
-  const [watchlist, setWatchlist] = useState<any[]>([]); // Estado para guardar a watchlist
-  const [loading, setLoading] = useState(true); // Estado para indicar carregamento
-  const [error, setError] = useState<string | null>(null); // Estado para erros
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [newSymbol, setNewSymbol] = useState(''); // Estado para o input do novo símbolo
+  const [newKind, setNewKind] = useState('stock_br'); // Estado para o input do novo tipo, com valor padrão
 
-  // useEffect para buscar os dados da API quando o componente for montado
-  useEffect(() => {
-    async function fetchWatchlist() {
-      try {
-        const response = await fetch('/api/watchlist/get'); // Chama a API que criamos
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        setWatchlist(data); // Atualiza o estado com os dados da watchlist
-      } catch (err: any) {
-        setError(err.message); // Captura e define qualquer erro
-      } finally {
-        setLoading(false); // Finaliza o carregamento
+  // Função para buscar a watchlist (refatorada para ser reutilizável)
+  async function fetchWatchlist() {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/watchlist/get');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      const data = await response.json();
+      setWatchlist(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
+  }
+
+  // useEffect para carregar a watchlist na montagem do componente
+  useEffect(() => {
     fetchWatchlist();
-  }, []); // O array vazio garante que o useEffect rode apenas uma vez (na montagem)
+  }, []);
+
+  // Handler para adicionar um novo item
+  const handleAddItem = async (e: FormEvent) => {
+    e.preventDefault(); // Previne o recarregamento da página
+    setError(null); // Limpa erros anteriores
+
+    if (!newSymbol || !newKind) {
+      setError('Símbolo e Tipo são obrigatórios.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/watchlist/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: newSymbol, kind: newKind }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      setNewSymbol(''); // Limpa o input do símbolo
+      // setNewKind('stock_br'); // Mantém o tipo padrão ou limpa, dependendo da UX
+      await fetchWatchlist(); // Recarrega a lista para mostrar o novo item
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  // Handler para remover um item
+  const handleRemoveItem = async (id: string) => {
+    setError(null); // Limpa erros anteriores
+    try {
+      const response = await fetch('/api/watchlist/remove', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      await fetchWatchlist(); // Recarrega a lista para remover o item
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
 
   return (
     <main style={{
@@ -90,17 +157,42 @@ export default function Preview() {
                 </p>
               </div>
 
-              {/* ----- INÍCIO DA WATCHLIST DINÂMICA ----- */}
+              {/* ----- INÍCIO DA WATCHLIST DINÂMICA COM FORMULÁRIO ----- */}
               <div style={itemStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                   <h3 style={{ margin: 0, fontSize: 14 }}>Minha Watchlist</h3>
-                  <a style={{ ...btnStyle, background: 'rgba(255,255,255,.04)' }} href="#">Config</a> {/* Botão de config ainda sem funcionalidade */}
+                  {/* <a style={{ ...btnStyle, background: 'rgba(255,255,255,.04)' }} href="#">Config</a> */}
                 </div>
+
+                {/* Formulário para adicionar item */}
+                <form onSubmit={handleAddItem} style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    placeholder="Símbolo (Ex: BTC, VALE3)"
+                    value={newSymbol}
+                    onChange={(e) => setNewSymbol(e.target.value.toUpperCase())} // Converte para maiúsculas
+                    style={inputStyle}
+                    required
+                  />
+                  <select
+                    value={newKind}
+                    onChange={(e) => setNewKind(e.target.value)}
+                    style={selectStyle}
+                    required
+                  >
+                    <option value="stock_br">Ação BR</option>
+                    <option value="fii_br">FII BR</option>
+                    <option value="crypto">Cripto</option>
+                    {/* Adicione outros tipos conforme necessário */}
+                  </select>
+                  <button type="submit" style={addButtonStyle}>Adicionar</button>
+                </form>
+
                 {loading && <p style={pStyle}>Carregando watchlist...</p>}
-                {error && <p style={{ ...pStyle, color: '#ff6b6b' }}>Erro ao carregar watchlist: {error}</p>}
+                {error && <p style={{ ...pStyle, color: '#ff6b6b' }}>Erro: {error}</p>}
                 {!loading && !error && (
                   watchlist.length === 0 ? (
-                    <p style={pStyle}>Nenhum ativo na watchlist. Adicione alguns!</p>
+                    <p style={pStyle}>Nenhum ativo na watchlist. Adicione alguns acima!</p>
                   ) : (
                     <table style={tableStyle}>
                       <thead>
@@ -108,14 +200,23 @@ export default function Preview() {
                           <th style={tableHeaderStyle}>Símbolo</th>
                           <th style={tableHeaderStyle}>Tipo</th>
                           <th style={tableHeaderStyle}>Adicionado em</th>
+                          <th style={tableHeaderStyle}>Ações</th> {/* Nova coluna para ações */}
                         </tr>
                       </thead>
                       <tbody>
-                        {watchlist.map((item: any) => (
+                        {watchlist.map((item: WatchlistItem) => (
                           <tr key={item.id}>
                             <td style={tableCellStyle}>{item.symbol}</td>
                             <td style={tableCellStyle}>{item.kind}</td>
                             <td style={tableCellStyle}>{new Date(item.created_at).toLocaleDateString()}</td>
+                            <td style={tableCellStyle}>
+                              <button
+                                onClick={() => handleRemoveItem(item.id)}
+                                style={removeButtonStyle}
+                              >
+                                Remover
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -123,7 +224,7 @@ export default function Preview() {
                   )
                 )}
               </div>
-              {/* ----- FIM DA WATCHLIST DINÂMICA ----- */}
+              {/* ----- FIM DA WATCHLIST DINÂMICA COM FORMULÁRIO ----- */}
 
             </div>
           </section>
@@ -247,4 +348,49 @@ const tableCellStyle: React.CSSProperties = {
   borderBottom: '1px solid rgba(255,255,255,.05)',
   color: '#e8f0ff',
   fontSize: 13,
+  display: 'table-cell', // Garante que o display seja de célula de tabela
+  verticalAlign: 'middle', // Alinha verticalmente
+};
+
+// Novos estilos para inputs e botões
+const inputStyle: React.CSSProperties = {
+  background: 'rgba(255,255,255,.05)',
+  border: '1px solid rgba(255,255,255,.10)',
+  borderRadius: 8,
+  padding: '8px 12px',
+  color: '#e8f0ff',
+  fontSize: 13,
+  flexGrow: 1, // Permite que o input cresça
+};
+
+const selectStyle: React.CSSProperties = {
+  background: 'rgba(255,255,255,.05)',
+  border: '1px solid rgba(255,255,255,.10)',
+  borderRadius: 8,
+  padding: '8px 12px',
+  color: '#e8f0ff',
+  fontSize: 13,
+};
+
+const addButtonStyle: React.CSSProperties = {
+  background: '#32d583', // Verde para adicionar
+  color: '#0b1220',
+  border: 'none',
+  borderRadius: 8,
+  padding: '8px 12px',
+  cursor: 'pointer',
+  fontSize: 13,
+  fontWeight: 'bold',
+  flexShrink: 0, // Não permite que o botão diminua
+};
+
+const removeButtonStyle: React.CSSProperties = {
+  background: '#ff6b6b', // Vermelho para remover
+  color: '#ffffff',
+  border: 'none',
+  borderRadius: 6,
+  padding: '6px 10px',
+  cursor: 'pointer',
+  fontSize: 12,
+  fontWeight: 'bold',
 };
