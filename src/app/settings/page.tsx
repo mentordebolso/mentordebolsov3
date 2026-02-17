@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, FormEvent } from 'react';
-import { useAdvancedSettings } from '../../../hooks/useAdvancedSettings'; // Ajuste o path se necessário
+import { useAdvancedSettings } from '@/hooks/useAdvancedSettings';
 
 // Estilos básicos (repetidos para não depender do page.tsx, ou podem ser centralizados depois)
 const cardStyle: React.CSSProperties = {
