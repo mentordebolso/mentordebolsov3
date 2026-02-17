@@ -15,7 +15,7 @@ interface PriceData {
   last_updated: string;
 }
 
-export function useWatchlist() {
+export function useWatchlist(pollingIntervalMs: number = 60000) {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [prices, setPrices] = useState<{[symbol: string]: PriceData}>({});
   const [loadingWatchlist, setLoadingWatchlist] = useState(true);
@@ -74,10 +74,10 @@ export function useWatchlist() {
 
     const intervalId = setInterval(() => {
       fetchWatchlistAndPrices(); // Atualiza a cada 1 minuto
-    }, 60000); // 1 minuto
+    }, pollingIntervalMs); // Usa o intervalo configurado
 
     return () => clearInterval(intervalId); // Limpa o intervalo na desmontagem
-  }, []);
+  }, [pollingIntervalMs]); // Depende do pollingIntervalMs para re-configurar o intervalo
 
   // Handler para adicionar um novo item
   const handleAddItem = async (symbol: string, kind: string) => {
