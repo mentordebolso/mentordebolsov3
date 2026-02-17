@@ -1,22 +1,30 @@
 'use client';
 
 import React from 'react';
-import { useWatchlist } from '../../hooks/useWatchlist'; // Importa o hook
-import { WatchlistForm } from '../../components/WatchlistForm'; // Importa o formulário
-import { WatchlistTable } from '../../components/WatchlistTable'; // Importa a tabela
+import Link from 'next/link'; // Importar Link do Next.js
+import { useWatchlist } from '@/hooks/useWatchlist';
+import { useAdvancedSettings } from '@/hooks/useAdvancedSettings'; // Importar o hook de configurações avançadas
+import { WatchlistForm } from '@/components/WatchlistForm';
+import { WatchlistTable } from '@/components/WatchlistTable';
 
 export default function Preview() {
+  const { settings, loading: loadingAdvancedSettings, error: errorAdvancedSettings } = useAdvancedSettings();
+
+  // Use as configurações avançadas para o polling interval, com fallback para 1 minuto (60000ms)
+  const pollingInterval = settings?.polling_interval_ms || 60000;
+
   const {
     watchlist,
     prices,
     loadingWatchlist,
     loadingPrices,
-    error,
+    error: errorWatchlist,
     handleAddItem,
     handleRemoveItem,
-  } = useWatchlist();
+  } = useWatchlist(pollingInterval); // Passa o intervalo configurável
 
-  const currentLoading = loadingWatchlist || loadingPrices;
+  const currentLoading = loadingWatchlist || loadingPrices || loadingAdvancedSettings;
+  const currentError = errorWatchlist || errorAdvancedSettings;
 
   return (
     <main style={{
@@ -51,7 +59,8 @@ export default function Preview() {
               </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <a style={btnStyle} href="#">Ver plano 30 dias</a>
-                <a style={{ ...btnStyle, background: 'rgba(255,255,255,.04)' }} href="#">Configurar alertas</a>
+                {/* Botão Configurar alertas agora é um link real para /settings */}
+                <Link href="/settings" style={{ ...btnStyle, background: 'rgba(255,255,255,.04)' }}>Configurações</Link>
               </div>
             </div>
 
@@ -67,19 +76,27 @@ export default function Preview() {
                   <h3 style={{ margin: 0, fontSize: 14 }}>Ação de hoje</h3>
                   <span style={tagStyle}>Manhã (09:00)</span>
                 </div>
-                <p style={pStyle}><b>Hoje:</b> manter consistência. Se for dia de aporte, comprar aos poucos (spot) e registrar no diário.</p>
+                {/* Exibe a ação diária configurada ou um placeholder */}
+                <p style={pStyle}>
+                  {settings?.daily_action || 'Nenhuma ação diária configurada ainda. Configure em "Configurações".'}
+                </p>
               </div>
 
               <div style={itemStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                  <h3 style={{ margin: 0, fontSize: 14 }}>Checklist anti-impulso</h3>
+                  <h3 style={{ margin: 0, fontSize: 14 }}>Checklist Anti-Impulso</h3>
                   <span style={tagStyle}>Guardrails</span>
                 </div>
-                <p style={pStyle}>
-                  • Estou com FOMO?<br />
-                  • Estou tentando “recuperar prejuízo” rápido?<br />
-                  • Se eu errar, minha perda máxima está controlada?
-                </p>
+                {/* Exibe os itens do checklist configurados ou um placeholder */}
+                <ul style={{ ...pStyle, margin: '0', padding: '0 0 0 1.2em' }}>
+                  {settings?.anti_impulse_checklist && settings.anti_impulse_checklist.length > 0 ? (
+                    settings.anti_impulse_checklist.map((item, index) => (
+                      <li key={index}>{item}</li>
+                    ))
+                  ) : (
+                    <li>Nenhum item no checklist. Configure em "Configurações".</li>
+                  )}
+                </ul>
               </div>
 
               {/* ----- WATCHLIST REFACTORADA ----- */}
@@ -88,7 +105,7 @@ export default function Preview() {
                   <h3 style={{ margin: 0, fontSize: 14 }}>Minha Watchlist</h3>
                 </div>
 
-                <WatchlistForm onAddItem={handleAddItem} error={error} loading={currentLoading} />
+                <WatchlistForm onAddItem={handleAddItem} error={currentError} loading={currentLoading} />
                 <WatchlistTable
                   watchlist={watchlist}
                   prices={prices}
@@ -108,7 +125,7 @@ export default function Preview() {
               <br /><br />
               <code style={{ color: '#b7d5ff' }}>/start</code> cria teu perfil e watchlist.<br />
               <code style={{ color: '#b7d5ff' }}> /plano</code> mostra o plano 30 dias.<br />
-              <code style={{ color: '#b7d5ff' }}>/ok</code> e <code style={{ color: '#b7d5ff' }}>/nao</code> registram se você fez a tarefa.<br />
+              <code style={{ color: '#b7d5ff' }}>/ok</code> e <code style={{ color: '#b7d5ff' }> /nao</code> registram se você fez a tarefa.<br />
             </p>
 
             <div style={itemStyle}>
@@ -124,9 +141,9 @@ export default function Preview() {
               <h3 style={{ margin: 0, fontSize: 14 }}>Links internos (backend)</h3>
               <p style={pStyle}>
                 <code style={{ color: '#b7d5ff' }}>/api/telegram/webhook</code><br />
-                <code style={{ color: '#b7d5ff' }}>/api/cron/morning</code><br />
-                <code style={{ color: '#b7d5ff' }}>/api/cron/afternoon</code><br />
-                <code style={{ color: '#b7d5ff' }}>/api/cron/night</code><br />
+                <code style={{ color: '#b7d5ff' }}> /api/cron/morning</code><br />
+                <code style={{ color: '#b7d5ff' }}> /api/cron/afternoon</code><br />
+                <code style={{ color: '#b7d5ff' }}> /api/cron/night</code><br />
               </p>
             </div>
           </aside>
