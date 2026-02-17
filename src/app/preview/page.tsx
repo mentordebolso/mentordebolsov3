@@ -1,4 +1,31 @@
+'use client'; // <-- Adicionar esta diretiva no topo
+
+import React, { useEffect, useState } from 'react'; // Importar useState e useEffect
+
 export default function Preview() {
+  const [watchlist, setWatchlist] = useState<any[]>([]); // Estado para guardar a watchlist
+  const [loading, setLoading] = useState(true); // Estado para indicar carregamento
+  const [error, setError] = useState<string | null>(null); // Estado para erros
+
+  // useEffect para buscar os dados da API quando o componente for montado
+  useEffect(() => {
+    async function fetchWatchlist() {
+      try {
+        const response = await fetch('/api/watchlist/get'); // Chama a API que criamos
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setWatchlist(data); // Atualiza o estado com os dados da watchlist
+      } catch (err: any) {
+        setError(err.message); // Captura e define qualquer erro
+      } finally {
+        setLoading(false); // Finaliza o carregamento
+      }
+    }
+    fetchWatchlist();
+  }, []); // O array vazio garante que o useEffect rode apenas uma vez (na montagem)
+
   return (
     <main style={{
       minHeight: '100vh',
@@ -63,17 +90,41 @@ export default function Preview() {
                 </p>
               </div>
 
+              {/* ----- INÍCIO DA WATCHLIST DINÂMICA ----- */}
               <div style={itemStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                  <h3 style={{ margin: 0, fontSize: 14 }}>Watchlist (exemplo)</h3>
-                  <span style={tagStyle}>Config</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: 14 }}>Minha Watchlist</h3>
+                  <a style={{ ...btnStyle, background: 'rgba(255,255,255,.04)' }} href="#">Config</a> {/* Botão de config ainda sem funcionalidade */}
                 </div>
-                <p style={pStyle}>
-                  <b>Cripto:</b> BTC, ETH<br />
-                  <b>Ações:</b> ITUB4, PETR4, VALE3, BPAC11, ABEV3, BBAS3, BBSE3, ITSA4<br />
-                  <b>FIIs:</b> MXRF11, GARE11, XPML11, VGHF11, HGLG11
-                </p>
+                {loading && <p style={pStyle}>Carregando watchlist...</p>}
+                {error && <p style={{ ...pStyle, color: '#ff6b6b' }}>Erro ao carregar watchlist: {error}</p>}
+                {!loading && !error && (
+                  watchlist.length === 0 ? (
+                    <p style={pStyle}>Nenhum ativo na watchlist. Adicione alguns!</p>
+                  ) : (
+                    <table style={tableStyle}>
+                      <thead>
+                        <tr>
+                          <th style={tableHeaderStyle}>Símbolo</th>
+                          <th style={tableHeaderStyle}>Tipo</th>
+                          <th style={tableHeaderStyle}>Adicionado em</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {watchlist.map((item: any) => (
+                          <tr key={item.id}>
+                            <td style={tableCellStyle}>{item.symbol}</td>
+                            <td style={tableCellStyle}>{item.kind}</td>
+                            <td style={tableCellStyle}>{new Date(item.created_at).toLocaleDateString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )
+                )}
               </div>
+              {/* ----- FIM DA WATCHLIST DINÂMICA ----- */}
+
             </div>
           </section>
 
@@ -84,7 +135,7 @@ export default function Preview() {
               <br /><br />
               <code style={{ color: '#b7d5ff' }}>/start</code> cria teu perfil e watchlist.<br />
               <code style={{ color: '#b7d5ff' }}>/plano</code> mostra o plano 30 dias.<br />
-              <code style={{ color: '#b7d5ff' }}>/ok</code> e <code style={{ color: '#b7d5ff' }}>/nao</code> registram se você fez a tarefa.
+              <code style={{ color: '#b7d5ff' }}>/ok</code> e <code style={{ color: '#b7d5ff' }}>/nao</code> registram se você fez a tarefa.<br />
             </p>
 
             <div style={itemStyle}>
@@ -92,7 +143,7 @@ export default function Preview() {
               <p style={pStyle}>
                 • Dashboard com histórico e métricas<br />
                 • Paper trading<br />
-                • Execução real na Coinbase (com limites)
+                • Execução real na Coinbase (com limites)<br />
               </p>
             </div>
 
@@ -102,7 +153,7 @@ export default function Preview() {
                 <code style={{ color: '#b7d5ff' }}>/api/telegram/webhook</code><br />
                 <code style={{ color: '#b7d5ff' }}>/api/cron/morning</code><br />
                 <code style={{ color: '#b7d5ff' }}>/api/cron/afternoon</code><br />
-                <code style={{ color: '#b7d5ff' }}>/api/cron/night</code>
+                <code style={{ color: '#b7d5ff' }}>/api/cron/night</code><br />
               </p>
             </div>
           </aside>
@@ -116,6 +167,7 @@ export default function Preview() {
   );
 }
 
+// Estilos existentes (mantidos como estavam)
 const cardStyle: React.CSSProperties = {
   background: 'linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02))',
   border: '1px solid rgba(255,255,255,.10)',
@@ -174,3 +226,25 @@ const tagStyle: React.CSSProperties = {
 };
 
 const pStyle: React.CSSProperties = { margin: '8px 0 0', color: '#9db0d0', fontSize: 13, lineHeight: 1.5 };
+
+// Novos estilos para a tabela da watchlist
+const tableStyle: React.CSSProperties = {
+  width: '100%',
+  marginTop: 10,
+  borderCollapse: 'collapse',
+};
+
+const tableHeaderStyle: React.CSSProperties = {
+  textAlign: 'left',
+  padding: '8px 0',
+  borderBottom: '1px solid rgba(255,255,255,.10)',
+  color: '#9db0d0',
+  fontSize: 12,
+};
+
+const tableCellStyle: React.CSSProperties = {
+  padding: '8px 0',
+  borderBottom: '1px solid rgba(255,255,255,.05)',
+  color: '#e8f0ff',
+  fontSize: 13,
+};
