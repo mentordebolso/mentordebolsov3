@@ -124,8 +124,8 @@ export default function Preview() {
               O app web é só um painel. O “Mentor” vive no Telegram:
               <br /><br />
               <code style={{ color: '#b7d5ff' }}>/start</code> cria teu perfil e watchlist.<br />
-              <code style={{ color: '#b7d5ff' }}> /plano</code> mostra o plano 30 dias.<br />
-              <code style={{ color: '#b7d5ff' }}>/ok</code> e <code style={{ color: '#b7d5ff' }> /nao</code> registram se você fez a tarefa.<br />
+              <code style={{ color: '#b7d5ff' }}>/plano</code> mostra o plano 30 dias.<br />
+              <code style={{ color: '#b7d5ff' }}>/ok</code> e <code style={{ color: '#b7d5ff' }}>/nao</code> registram se você fez a tarefa.<br />
             </p>
 
             <div style={itemStyle}>
