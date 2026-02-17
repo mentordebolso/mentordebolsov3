@@ -84,7 +84,7 @@ export default function Preview() {
 
     const intervalId = setInterval(() => {
       fetchWatchlistAndPrices(); // Atualiza a cada 10 segundos
-    }, 10000); // 10 segundos
+    }, 60000); // 1 minuto
 
     // Limpa o intervalo quando o componente é desmontado
     return () => clearInterval(intervalId);
